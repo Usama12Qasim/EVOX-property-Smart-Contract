@@ -70,6 +70,8 @@ contract EVOXPropertyMarketplace is
     }
 
     function initialize(IERC20 _EVOXToken) public initializer {
+        __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
         EvoxToken = _EVOXToken;
     }
 
@@ -145,6 +147,8 @@ contract EVOXPropertyMarketplace is
         Property.propertyFractionsOwner.push(msg.sender);
 
         EvoxToken.transferFrom(msg.sender, Property.Seller, RequiredAmount);
+
+        emit BuyPropertyFractions(propertyID, propertyFractions, RequiredAmount);
     }
 
     function depositROI(
@@ -175,6 +179,7 @@ contract EVOXPropertyMarketplace is
     function claimROI(uint256 propertyID) external nonReentrant {
         uint256 userShares = TrackFractions[msg.sender][propertyID];
         require(userShares > 0, "No Property Fractions Owned");
+        require(msg.sender != address(0), "Invalid Address");
 
         _claimROI(propertyID);
     }
