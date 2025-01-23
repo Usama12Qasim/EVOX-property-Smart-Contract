@@ -14,74 +14,155 @@ contract PropertyCreation is
     Initializable,
     ERC1155Upgradeable,
     OwnableUpgradeable,
-    ERC1155SupplyUpgradeable
+    ERC1155SupplyUpgradeable,
+    ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+    
+    event BuyPropertyFractions(
+        uint256 PropertyID,
+        uint256 PropertyFractions,
+        uint256 purchasePrice
+    );
+
+    event ClaimROIAmount(
+        address FractionOwner,
+        uint256 RoiAmount,
+        uint256 ClaimTime
+    );
+
     struct PropertyDetail {
         address PropertyOwner;
         string PropertyName;
         string PropertyUri;
-        uint256 PropertyPrice;
-        uint256 perFractionprice;
         uint256 totalFractions;
         uint256 PropertyID;
-        uint256 ROIPercentage;
+        uint256 availableFractions;
     }
 
     PropertyDetail public propertyDetails;
+    mapping(address => mapping(uint256 => uint256)) public TrackFractions;
+    mapping(address => mapping(uint256 => uint256)) public lastClaimROITime;
     address public FactoryAddress;
-    address public fundsWallet;
-    IERC20 public EVOXToken;
+    IERC20 public EvoxToken;
 
-    mapping(uint256 => PropertyDetail) properties;
     mapping(uint256 => string) private _tokenURIs;
 
     function initialize(
         string memory _propertyName,
         string memory _propertyUri,
-        uint256 _propertyPrice,
-        uint256 _perFractionPrice,
-        uint256 _maxSupply,
-        uint256 _ROIPercentage,
+        uint256 fractions,
         address owner,
         address _factoryAddress,
-        address _fundsWallet,
         address _EVOXToken,
         uint256 _propertyID
     ) public initializer {
         __ERC1155_init(_propertyUri);
         __Ownable_init(owner);
         __ERC1155Supply_init();
-
-        fundsWallet = _fundsWallet;
-        EVOXToken = IERC20(_EVOXToken);
+        __ReentrancyGuard_init();
 
         propertyDetails.PropertyOwner = owner;
         propertyDetails.PropertyUri = _propertyUri;
         propertyDetails.PropertyName = _propertyName;
-        propertyDetails.PropertyPrice = _propertyPrice;
-        propertyDetails.perFractionprice = _perFractionPrice;
-        propertyDetails.ROIPercentage = _ROIPercentage;
+        propertyDetails.PropertyID = _propertyID;
+        propertyDetails.totalFractions = fractions;
+        propertyDetails.availableFractions = fractions;
         FactoryAddress = _factoryAddress;
+        EvoxToken = IERC20(_EVOXToken);
 
-        _mint(_propertyID, _propertyUri, _maxSupply);
+        _setTokenURI(_propertyID, _propertyUri);
     }
 
-    function _mint(
-        uint256 propertyID,
-        string memory _propertyUri,
+    function buyPropertyFractions(
+        uint256 propertyFractions
+    ) external payable nonReentrant {
+        require(exists(propertyDetails.PropertyID), "Property: Not Existed");
+        require(
+            propertyFractions > 0 &&
+                propertyFractions <= propertyDetails.availableFractions,
+            "Property: Out Of Stock"
+        );
+
+        require(msg.value > 0, "InSufficient Amount");
+
+        propertyDetails.availableFractions -= propertyFractions;
+        TrackFractions[msg.sender][
+            propertyDetails.PropertyID
+        ] += propertyFractions;
+
+        payable(propertyDetails.PropertyOwner).transfer(msg.value);
+
+        _mint(msg.sender, propertyDetails.PropertyID, propertyFractions, "");
+
+        emit BuyPropertyFractions(
+            propertyDetails.PropertyID,
+            propertyFractions,
+            msg.value
+        );
+    }
+
+    function buyFractionByEVOXTokens(
+        uint256 propertyFractions,
         uint256 amount
-    ) internal {
-        propertyDetails.totalFractions = amount;
-        propertyDetails.PropertyID = propertyID;
+    ) external nonReentrant {
+        require(exists(propertyDetails.PropertyID), "Property: Not Existed");
+        require(
+            propertyFractions > 0 &&
+                propertyFractions <= propertyDetails.availableFractions,
+            "Property: Out Of Stock"
+        );
 
-        _mint(msg.sender, propertyID, amount, "");
-        _setTokenURI(propertyID, _propertyUri);
+        require(
+            EvoxToken.balanceOf(msg.sender) >= amount,
+            "Insufficient Amount to purchase Property"
+        );
+
+        propertyDetails.availableFractions -= propertyFractions;
+        TrackFractions[msg.sender][
+            propertyDetails.PropertyID
+        ] += propertyFractions;
+
+        EvoxToken.transferFrom(
+            msg.sender,
+            propertyDetails.PropertyOwner,
+            amount
+        );
+
+        _mint(msg.sender, propertyDetails.PropertyID, propertyFractions, "");
+
+        emit BuyPropertyFractions(
+            propertyDetails.PropertyID,
+            propertyFractions,
+            amount
+        );
     }
 
-    function getPropertyInfo(
-        uint256 _propertyID
-    ) public view returns (PropertyDetail memory) {
-        return properties[_propertyID];
+    function claimROI(
+        uint256 propertyID,
+        uint256 amount
+    ) external nonReentrant {
+        uint256 userShares = TrackFractions[msg.sender][propertyID];
+        require(userShares > 0, "No Property Fractions Owned");
+        require(msg.sender != address(0), "Invalid Address");
+
+        _claimROI(propertyID, amount);
+    }
+
+    function _claimROI(uint256 propertyID, uint256 amount) internal {
+        require(
+            block.timestamp >=
+                lastClaimROITime[msg.sender][propertyID] + 30 days,
+            "ROI can only be claimed once per month"
+        );
+
+        require(amount > 0, "No ROI available for claim");
+
+        lastClaimROITime[msg.sender][propertyID] = block.timestamp;
+
+        payable(msg.sender).transfer(amount);
+
+        emit ClaimROIAmount(msg.sender, amount, block.timestamp);
     }
 
     function _setTokenURI(
@@ -105,5 +186,25 @@ contract PropertyCreation is
         uint256[] memory values
     ) internal override(ERC1155Upgradeable, ERC1155SupplyUpgradeable) {
         super._update(from, to, ids, values);
+    }
+
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
     }
 }

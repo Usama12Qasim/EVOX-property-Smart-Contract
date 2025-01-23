@@ -22,9 +22,9 @@ module.exports = {
    solidity: {
       version: "0.8.28",
       settings: {
-         viaIR: true,
+         viaIR: false,
          optimizer: {
-            enabled: false,
+            enabled: true,
             runs: 200,
          },
       },

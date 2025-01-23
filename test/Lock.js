@@ -1,126 +1,143 @@
-const {
-  time,
-  loadFixture,
-} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
-const { expect } = require("chai");
+const { expect } = require("chai")
+const { ethers, upgrades } = require("hardhat");
 
-describe("Lock", function () {
-  // We define a fixture to reuse the same setup in every test.
-  // We use loadFixture to run this setup once, snapshot that state,
-  // and reset Hardhat Network to that snapshot in every test.
-  async function deployOneYearLockFixture() {
-    const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-    const ONE_GWEI = 1_000_000_000;
+describe("Natrium Marketpalce", function () {
 
-    const lockedAmount = ONE_GWEI;
-    const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
+  let owner;
+  let admin;
+  let addr1;
+  let buyer1;
+  let buyer2;
+  let buyer3;
+  let buyer4;
 
-    // Contracts are deployed using the first signer/account by default
-    const [owner, otherAccount] = await ethers.getSigners();
+  let deployedEVOXFactoryContract;
+  let deployedEVOXTicketingContract;
+  let deployedEVOXMarketplace;
+  let deployedEVOXStaking;
+  let deployedEVOXToken;
 
-    const Lock = await ethers.getContractFactory("Lock");
-    const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  beforeEach(async () => {
+    [
+      owner,
+      admin,
+      addr1,
+      minter1,
+      minter2,
+      minter3,
+      buyer1,
+      buyer2,
+      buyer3,
+      buyer4,
+      walletlet,
+      _usdtTokenlet
+    ] = await ethers.getSigners();
 
-    return { lock, unlockTime, lockedAmount, owner, otherAccount };
-  }
 
-  describe("Deployment", function () {
-    it("Should set the right unlockTime", async function () {
-      const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
+    const EVOXFactoryContract = await ethers.getContractFactory("EVOXFactory");
+    deployedEVOXFactoryContract = await EVOXFactoryContract.deploy();
+    await deployedEVOXFactoryContract.connect(owner).waitForDeployment();
 
-      expect(await lock.unlockTime()).to.equal(unlockTime);
-    });
+    //console.log("EVOX Factory Contract deployed to:", deployedEVOXFactoryContract.target);
 
-    it("Should set the right owner", async function () {
-      const { lock, owner } = await loadFixture(deployOneYearLockFixture);
+    //EVOX Ticketing Nft Contract
+    const EVOXNftContract = await ethers.getContractFactory("PropertyCreation");
 
-      expect(await lock.owner()).to.equal(owner.address);
-    });
+    deployedEVOXTicketingContract = await EVOXNftContract.deploy();
 
-    it("Should receive and store the funds to lock", async function () {
-      const { lock, lockedAmount } = await loadFixture(
-        deployOneYearLockFixture
-      );
+    // Wait for the contract to be deployed
+    await deployedEVOXTicketingContract.connect(owner).waitForDeployment();
+    //console.log("EVOX ERC-1155 deployed to:", deployedEVOXTicketingContract.target);
 
-      expect(await ethers.provider.getBalance(lock.target)).to.equal(
-        lockedAmount
-      );
-    });
+    //console.log("EVOX Marketplace deployed to:", deployedEVOXMarketplace.target);
 
-    it("Should fail if the unlockTime is not in the future", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const latestTime = await time.latest();
-      const Lock = await ethers.getContractFactory("Lock");
-      await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-        "Unlock time should be in the future"
-      );
-    });
+    const EVOXStaking = await ethers.getContractFactory("EVOXStaking");
+
+    deployedEVOXStaking = await EVOXStaking.deploy();
+
+    // Wait for the contract to be deployed
+    await deployedEVOXStaking.connect(owner).waitForDeployment();
+    //console.log("EVOX Staking deployed to:", deployedEVOXStaking.target);
+
+    const EVOXToken = await ethers.getContractFactory("MyToken");
+
+    deployedEVOXToken = await EVOXToken.deploy();
+
+    // Wait for the contract to be deployed
+    await deployedEVOXToken.connect(owner).waitForDeployment();
+    //console.log("EVOX Token deployed to:", deployedEVOXToken.target);
+
   });
 
-  describe("Withdrawals", function () {
-    describe("Validations", function () {
-      it("Should revert with the right error if called too soon", async function () {
-        const { lock } = await loadFixture(deployOneYearLockFixture);
+  describe("Create Property", function () {
+    it("should deploy new property", async () => {
+      let _propertyName = "EVOX";
+      let _propertyUri = "EVOX.com"
+      let _maxSupply = 100;
 
-        await expect(lock.withdraw()).to.be.revertedWith(
-          "You can't withdraw yet"
-        );
-      });
+      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
+        _propertyName,
+        _propertyUri,
+        _maxSupply,
+        addr1.address
+      )
+      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
+        _propertyName,
+        _propertyUri,
+        _maxSupply,
+        addr1.address
+      )
+      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
+        _propertyName,
+        _propertyUri,
+        _maxSupply,
+        addr1.address
+      )
+      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
+        _propertyName,
+        _propertyUri,
+        _maxSupply,
+        addr1.address
+      )
 
-      it("Should revert with the right error if called from another account", async function () {
-        const { lock, unlockTime, otherAccount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+      let PropertyID0 = await deployedEVOXFactoryContract.deployedContractAddresses(0);
+      let PropertyID1 = await deployedEVOXFactoryContract.deployedContractAddresses(1);
+      let PropertyID2 = await deployedEVOXFactoryContract.deployedContractAddresses(2);
+      let PropertyID3 = await deployedEVOXFactoryContract.deployedContractAddresses(3);
+      console.log("Property ID of 0", PropertyID0);
+      console.log("Property ID of 1", PropertyID1);
+      console.log("Property ID of 2", PropertyID2);
+      console.log("Property ID of 3", PropertyID3);
 
-        // We can increase the time in Hardhat Network
-        await time.increaseTo(unlockTime);
-
-        // We use lock.connect() to send a transaction from another account
-        await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-          "You aren't the owner"
-        );
-      });
-
-      it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-        const { lock, unlockTime } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        // Transactions are sent using the first signer by default
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).not.to.be.reverted;
-      });
     });
 
-    describe("Events", function () {
-      it("Should emit an event on withdrawals", async function () {
-        const { lock, unlockTime, lockedAmount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    it("Stake Nfts and get EVOX Reward", async () => {
+      let _propertyName = "Sea Side Villa";
+      let _propertyUri = "ww.EVOX.com";
+      let fractions = 10;
+      let _propertyID = 1;
+      await deployedEVOXTicketingContract.connect(buyer1).initialize(
+        _propertyName, 
+        _propertyUri, 
+        fractions, 
+        buyer1.address, 
+        deployedEVOXFactoryContract.target, 
+        deployedEVOXToken.target,
+        _propertyID
+      );
 
-        await time.increaseTo(unlockTime);
+      let BalanceofBuyer1 = await deployedEVOXTicketingContract.balanceOf(buyer1.address, 1);
+      console.log("Balance of Buyer1 ", BalanceofBuyer1);
 
-        await expect(lock.withdraw())
-          .to.emit(lock, "Withdrawal")
-          .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-      });
-    });
+      await deployedEVOXStaking.connect(addr1).initialize(deployedEVOXToken.target, 10);
 
-    describe("Transfers", function () {
-      it("Should transfer the funds to the owner", async function () {
-        const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-          deployOneYearLockFixture
-        );
+      let getBlockNumber = await ethers.provider.getBlockNumber();
+      getBlock = await ethers.provider.getBlock(getBlockNumber);
+      blockTimestamp = getBlock.timestamp;
 
-        await time.increaseTo(unlockTime);
+      let endTime = blockTimestamp + (2 * 86400);
 
-        await expect(lock.withdraw()).to.changeEtherBalances(
-          [owner, lock],
-          [lockedAmount, -lockedAmount]
-        );
-      });
-    });
+      await deployedEVOXStaking.connect(buyer1).stakeNft(1, 5, endTime);
+    })
   });
 });

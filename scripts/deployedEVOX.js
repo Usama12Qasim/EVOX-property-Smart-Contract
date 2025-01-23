@@ -20,11 +20,13 @@ async function main() {
   await deployedEVOXTicketingContract.connect(owner).waitForDeployment();
   console.log("EVOX ERC-1155 deployed to:", deployedEVOXTicketingContract.target);
 
-//   const NatrimMarketplace = await ethers.getContractFactory("NatirumMarketplace");
-//   const natrimMarketplace = await NatrimMarketplace.deploy();
+  // const EVOXMarketplace = await ethers.getContractFactory("EVOXPropertyMarketplace");
 
-//   await natrimMarketplace.connect(owner).waitForDeployment();
-//   console.log("NatirumToken deployed to:", natrimMarketplace.target);
+  // deployedEVOXMarketplace = await EVOXMarketplace.deploy();
+
+  // // Wait for the contract to be deployed
+  // await deployedEVOXMarketplace.connect(owner).waitForDeployment();
+  // console.log("EVOX Marketplace deployed to:", deployedEVOXMarketplace.target);
 
 }
 main()

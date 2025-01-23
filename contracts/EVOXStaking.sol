@@ -2,13 +2,11 @@
 pragma solidity ^0.8.26;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./EVOXProperty.sol";
-import "./EVOXMarketplace.sol";
 
 contract EVOXStaking is
     OwnableUpgradeable,
@@ -17,7 +15,7 @@ contract EVOXStaking is
 {
     using SafeERC20 for IERC20;
 
-    event Stake(
+    event StakeNft(
         address Staker,
         uint256 PropertyID,
         uint256 NftFractions,
@@ -25,6 +23,8 @@ contract EVOXStaking is
         uint256 endTime,
         bool isStaked
     );
+
+    event ClaimReward(address Claimer, uint256 RewardAmount, uint256 ClaimTime);
 
     struct StakeInfo {
         address Staker;
@@ -39,12 +39,18 @@ contract EVOXStaking is
     mapping(address => uint256) public lastClaimRewardTime;
     mapping(address => uint256) public RewardAmount;
     IERC20 public RewardToken;
+    uint256 public totalStaked;
     uint256 private APY;
 
     function initialize(IERC20 _EvoxToken, uint256 _APY) public initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         RewardToken = _EvoxToken;
+        APY = _APY;
+    }
+
+    function updateAPY(uint256 _APY) external onlyOwner nonReentrant {
+        require(_APY != 0, "Invalid Amount");
         APY = _APY;
     }
 
@@ -64,9 +70,7 @@ contract EVOXStaking is
 
         require(!info.isStake, "Already Staked");
         require(
-            info.startTime != _endTime &&
-                block.timestamp < _endTime &&
-                info.startTime < _endTime,
+            block.timestamp < _endTime && info.startTime < _endTime,
             "Time Error"
         );
 
@@ -76,6 +80,7 @@ contract EVOXStaking is
         info.startTime = block.timestamp;
         info.endTime = _endTime;
         info.isStake = true;
+        totalStaked += _propertyFraction;
 
         safeTransferFrom(
             msg.sender,
@@ -84,17 +89,24 @@ contract EVOXStaking is
             _propertyFraction,
             ""
         );
+
+        emit StakeNft(
+            msg.sender,
+            propertyID,
+            _propertyFraction,
+            block.timestamp,
+            _endTime,
+            true
+        );
     }
 
     function unStakeNft(uint256 propertyID) external nonReentrant {
         StakeInfo memory info = UserInfo[msg.sender];
         require(
-            info.Staker == msg.sender,
+            info.Staker == msg.sender && msg.sender != address(0),
             "You are not Property Fraction Owner"
         );
         require(info.isStake, "Property Fraction is not Staked");
-
-        _claimReward(msg.sender);
 
         safeTransferFrom(
             address(this),
@@ -104,41 +116,52 @@ contract EVOXStaking is
             ""
         );
 
+        totalStaked -= info.NftFractions;
+
         delete UserInfo[msg.sender];
+    }
+
+    function withDraw() external nonReentrant {
+        StakeInfo memory info = UserInfo[msg.sender];
+        require(RewardAmount[msg.sender] > 0, "Rewards already WithDraw");
+        require(info.Staker == msg.sender, "Only Staker withDraw Reward");
+        require(
+            RewardToken.balanceOf(address(this)) > RewardAmount[msg.sender],
+            "Insufficient rewards in pool"
+        );
+
+        uint256 Reward = RewardAmount[msg.sender];
+        RewardAmount[msg.sender] = 0;
+
+        RewardToken.safeTransfer(msg.sender, Reward);
     }
 
     function claimReward() external nonReentrant {
         StakeInfo memory info = UserInfo[msg.sender];
         require(info.isStake, "Property Fractions is not Staked");
+
+        require(block.timestamp <= info.endTime, "Staking Period is over");
         require(
             block.timestamp >= lastClaimRewardTime[msg.sender] + 30 days,
             "Reward claimed Only Once In a Month"
         );
 
-        require(block.timestamp <= info.endTime, "Staking Period is over");
-        _claimReward(msg.sender);
-    }
+        uint256 Reward = _calculateReward(msg.sender);
+        RewardAmount[msg.sender] += Reward;
 
-    function _claimReward(address _user) internal {
-        uint256 Reward = _calculateReward(_user);
-        RewardAmount[_user] += Reward;
+        lastClaimRewardTime[msg.sender] = block.timestamp;
 
-        require(
-            RewardToken.balanceOf(address(this)) >= Reward,
-            "InSufficient Reward Amount"
-        );
-
-        lastClaimRewardTime[_user] = block.timestamp;
-
-        RewardAmount[_user] = 0;
-
-        RewardToken.transfer(_user, Reward);
+        emit ClaimReward(msg.sender, Reward, block.timestamp);
     }
 
     function _calculateReward(address _user) internal view returns (uint256) {
         StakeInfo memory info = UserInfo[_user];
         require(info.Staker == _user, "You are not Staker");
         require(info.NftFractions > 0, "No Staked Fractions Available");
+
+        if (block.timestamp > info.endTime) {
+            return 0;
+        }
         uint256 timeElapsed = block.timestamp - info.startTime;
         uint256 monthlyRate = APY / 12;
         uint256 calculateReward = (info.NftFractions *
@@ -154,7 +177,7 @@ contract EVOXStaking is
         uint256,
         uint256,
         bytes memory
-    ) public virtual returns (bytes4) {
+    ) public virtual override returns (bytes4) {
         return this.onERC1155Received.selector;
     }
 }
