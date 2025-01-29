@@ -39,9 +39,8 @@ module.exports = {
       },
 
       bscT: {
-         url: `https://rpc.ankr.com/bsc`,
+         url: `https://bnb-testnet.g.alchemy.com/v2/p3tNQAGh4MZMeNK7_LysiqT8Zty0ZyWy`,
          accounts: [process.env.PRIVATE_KEY],
-         gasPrice: 20000000000,
       },
 
       avalancheT: {

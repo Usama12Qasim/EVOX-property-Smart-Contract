@@ -28,6 +28,14 @@ async function main() {
   // await deployedEVOXMarketplace.connect(owner).waitForDeployment();
   // console.log("EVOX Marketplace deployed to:", deployedEVOXMarketplace.target);
 
+  //   const EVOXToken = await ethers.getContractFactory("EVOXToken");
+
+  // deployedEVOXToken = await EVOXToken.deploy();
+
+  // // Wait for the contract to be deployed
+  // await deployedEVOXToken.connect(owner).waitForDeployment();
+  // console.log("EVOX Marketplace deployed to:", deployedEVOXToken.target);
+
 }
 main()
   .then(() => process.exit(0))

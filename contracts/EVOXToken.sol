@@ -8,14 +8,14 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract MyToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable {
+contract EVOXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable {
 
 
     function initialize() initializer public {
-        __ERC20_init("MyToken", "MTK");
+        __ERC20_init("EVOXToken", "MTK");
         __ERC20Burnable_init();
         __Ownable_init(msg.sender);
-        __ERC20Permit_init("MyToken");
+        __ERC20Permit_init("EVOXToken");
     }
 
     function mint(address to, uint256 amount) public {

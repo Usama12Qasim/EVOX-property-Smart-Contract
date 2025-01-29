@@ -11,6 +11,15 @@ contract EVOXFactory is OwnableUpgradeable {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
+    event deployedProperty(
+        address deployer,
+        address Property, 
+        uint256 perFractionPrice, 
+        string PropertyUri, 
+        uint256 PropertyFractions, 
+        uint256 PropertyID
+    );
+
     mapping(uint256 => address) public deployedContractAddresses;
     uint256 public contractCount;
 
@@ -19,14 +28,14 @@ contract EVOXFactory is OwnableUpgradeable {
     }
 
     function deployNewProperty(
-        string memory _propertyName,
+        uint256 _perFractionPrice,
         string memory _propertyUri,
         uint256 fractions,
         IERC20 _EVOXToken
     ) public returns (address) {
         PropertyCreation newProperty = new PropertyCreation();
         newProperty.initialize(
-            _propertyName,
+            _perFractionPrice,
             _propertyUri,
             fractions,
             msg.sender,
@@ -37,6 +46,15 @@ contract EVOXFactory is OwnableUpgradeable {
 
         deployedContractAddresses[contractCount] = address(newProperty);
         contractCount++;
+
+        emit deployedProperty(
+            msg.sender, 
+            address(newProperty),
+            _perFractionPrice, 
+            _propertyUri, 
+            fractions, 
+            contractCount
+        );
 
         return address(newProperty);
     }

@@ -126,18 +126,39 @@ describe("Natrium Marketpalce", function () {
         _propertyID
       );
 
-      let BalanceofBuyer1 = await deployedEVOXTicketingContract.balanceOf(buyer1.address, 1);
-      console.log("Balance of Buyer1 ", BalanceofBuyer1);
+      await deployedEVOXTicketingContract.connect(buyer2).buyPropertyFractions(5, {value: ethers.parseEther("5")});
 
-      await deployedEVOXStaking.connect(addr1).initialize(deployedEVOXToken.target, 10);
+      let BalanceofBuyer2 = await deployedEVOXTicketingContract.balanceOf(buyer2.address, 1);
+      console.log("Balance of Buyer2 ", BalanceofBuyer2);
+
+      await deployedEVOXStaking.connect(addr1).initialize(deployedEVOXToken.target, 12);
 
       let getBlockNumber = await ethers.provider.getBlockNumber();
       getBlock = await ethers.provider.getBlock(getBlockNumber);
       blockTimestamp = getBlock.timestamp;
 
-      let endTime = blockTimestamp + (2 * 86400);
+      let endTime = blockTimestamp + (365 * 86400);
 
-      await deployedEVOXStaking.connect(buyer1).stakeNft(1, 5, endTime);
+      await deployedEVOXTicketingContract.connect(buyer2).setApprovalForAll(deployedEVOXStaking.target, true);
+      await deployedEVOXStaking.connect(buyer2).stakeNft(deployedEVOXTicketingContract.target,_propertyID, 5, endTime);
+
+      let PassedDay = 30 * (24 * 60 * 60);
+
+      await ethers.provider.send('evm_increaseTime', [PassedDay]);
+      await ethers.provider.send('evm_mine')
+
+      let Reward = await deployedEVOXStaking._calculateReward(buyer2.address);
+      console.log("Reward", Reward);
+
+      await deployedEVOXStaking.connect(buyer2).claimReward();
+      let PassedDay30 = 30 * (24 * 60 * 60);
+
+      await ethers.provider.send('evm_increaseTime', [PassedDay30]);
+      await ethers.provider.send('evm_mine')
+      await deployedEVOXStaking.connect(buyer2).claimReward();
+
+      let checkReward = await deployedEVOXStaking.RewardAmount(buyer2.address);
+      console.log("Check Reward", checkReward);
     })
   });
 });

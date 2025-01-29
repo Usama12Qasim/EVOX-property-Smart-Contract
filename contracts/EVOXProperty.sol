@@ -18,7 +18,7 @@ contract PropertyCreation is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
-    
+
     event BuyPropertyFractions(
         uint256 PropertyID,
         uint256 PropertyFractions,
@@ -33,11 +33,12 @@ contract PropertyCreation is
 
     struct PropertyDetail {
         address PropertyOwner;
-        string PropertyName;
+        uint256 perFractionPrice;
         string PropertyUri;
         uint256 totalFractions;
         uint256 PropertyID;
         uint256 availableFractions;
+        bool isPropertyCreated;
     }
 
     PropertyDetail public propertyDetails;
@@ -49,7 +50,7 @@ contract PropertyCreation is
     mapping(uint256 => string) private _tokenURIs;
 
     function initialize(
-        string memory _propertyName,
+        uint256 _perFractionPrice,
         string memory _propertyUri,
         uint256 fractions,
         address owner,
@@ -64,10 +65,11 @@ contract PropertyCreation is
 
         propertyDetails.PropertyOwner = owner;
         propertyDetails.PropertyUri = _propertyUri;
-        propertyDetails.PropertyName = _propertyName;
+        propertyDetails.perFractionPrice = _perFractionPrice;
         propertyDetails.PropertyID = _propertyID;
         propertyDetails.totalFractions = fractions;
         propertyDetails.availableFractions = fractions;
+        propertyDetails.isPropertyCreated = true;
         FactoryAddress = _factoryAddress;
         EvoxToken = IERC20(_EVOXToken);
 
@@ -77,14 +79,18 @@ contract PropertyCreation is
     function buyPropertyFractions(
         uint256 propertyFractions
     ) external payable nonReentrant {
-        require(exists(propertyDetails.PropertyID), "Property: Not Existed");
+        uint256 amountRequire = propertyFractions *
+            propertyDetails.perFractionPrice;
+        require(
+            msg.value >= amountRequire,
+            "InSufficient Amount to purchase Property Fractions"
+        );
+        require(propertyDetails.isPropertyCreated, "Property: Not Existed");
         require(
             propertyFractions > 0 &&
                 propertyFractions <= propertyDetails.availableFractions,
             "Property: Out Of Stock"
         );
-
-        require(msg.value > 0, "InSufficient Amount");
 
         propertyDetails.availableFractions -= propertyFractions;
         TrackFractions[msg.sender][
@@ -103,18 +109,19 @@ contract PropertyCreation is
     }
 
     function buyFractionByEVOXTokens(
-        uint256 propertyFractions,
-        uint256 amount
+        uint256 propertyFractions
     ) external nonReentrant {
-        require(exists(propertyDetails.PropertyID), "Property: Not Existed");
+        require(propertyDetails.isPropertyCreated, "Property: Not Existed");
         require(
             propertyFractions > 0 &&
                 propertyFractions <= propertyDetails.availableFractions,
             "Property: Out Of Stock"
         );
 
+        uint256 requireAmount = propertyFractions * propertyDetails.perFractionPrice;
+
         require(
-            EvoxToken.balanceOf(msg.sender) >= amount,
+            EvoxToken.balanceOf(msg.sender) >= requireAmount,
             "Insufficient Amount to purchase Property"
         );
 
@@ -126,7 +133,7 @@ contract PropertyCreation is
         EvoxToken.transferFrom(
             msg.sender,
             propertyDetails.PropertyOwner,
-            amount
+            requireAmount
         );
 
         _mint(msg.sender, propertyDetails.PropertyID, propertyFractions, "");
@@ -134,7 +141,7 @@ contract PropertyCreation is
         emit BuyPropertyFractions(
             propertyDetails.PropertyID,
             propertyFractions,
-            amount
+            requireAmount
         );
     }
 

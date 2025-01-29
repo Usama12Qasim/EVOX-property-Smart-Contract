@@ -28,6 +28,7 @@ contract EVOXStaking is
 
     struct StakeInfo {
         address Staker;
+        address PropertyAddress;
         uint256 PropertyID;
         uint256 NftFractions;
         bool isStake;
@@ -55,15 +56,17 @@ contract EVOXStaking is
     }
 
     function stakeNft(
+        address _propertyAddress,
         uint256 propertyID,
         uint256 _propertyFraction,
         uint256 _endTime
     ) external nonReentrant {
         StakeInfo storage info = UserInfo[msg.sender];
+        PropertyCreation property = PropertyCreation(_propertyAddress);
 
-        require(exists(propertyID), "Property ID: Not Existed");
+        require(property.exists(propertyID), "Property ID: Not Existed");
         require(
-            balanceOf(msg.sender, propertyID) >= _propertyFraction &&
+            property.balanceOf(msg.sender, propertyID) >= _propertyFraction &&
                 _propertyFraction > 0,
             "No Fraction Availabe"
         );
@@ -75,6 +78,7 @@ contract EVOXStaking is
         );
 
         info.Staker = msg.sender;
+        info.PropertyAddress = _propertyAddress;
         info.PropertyID = propertyID;
         info.NftFractions = _propertyFraction;
         info.startTime = block.timestamp;
@@ -82,7 +86,7 @@ contract EVOXStaking is
         info.isStake = true;
         totalStaked += _propertyFraction;
 
-        safeTransferFrom(
+        property.safeTransferFrom(
             msg.sender,
             address(this),
             propertyID,
@@ -154,19 +158,16 @@ contract EVOXStaking is
         emit ClaimReward(msg.sender, Reward, block.timestamp);
     }
 
-    function _calculateReward(address _user) internal view returns (uint256) {
+    function _calculateReward(address _user) public view returns (uint256) {
         StakeInfo memory info = UserInfo[_user];
         require(info.Staker == _user, "You are not Staker");
         require(info.NftFractions > 0, "No Staked Fractions Available");
 
-        if (block.timestamp > info.endTime) {
-            return 0;
-        }
         uint256 timeElapsed = block.timestamp - info.startTime;
         uint256 monthlyRate = APY / 12;
         uint256 calculateReward = (info.NftFractions *
             monthlyRate *
-            timeElapsed) / (30 days * 10000);
+            timeElapsed) / 10000 ;
 
         return calculateReward;
     }
