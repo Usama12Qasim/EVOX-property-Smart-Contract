@@ -9,13 +9,13 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract EVOXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, PausableUpgradeable {
+contract IGOToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, PausableUpgradeable {
 
     function initialize() initializer public {
-        __ERC20_init("EVOXToken", "ETK");
+        __ERC20_init("IGOToken", "IGT");
         __ERC20Burnable_init();
         __Ownable_init(msg.sender);
-        __ERC20Permit_init("EVOXToken");
+        __ERC20Permit_init("IGOToken");
         __Pausable_init();
     }
 

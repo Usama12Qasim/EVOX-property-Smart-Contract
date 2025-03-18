@@ -1,9 +1,14 @@
-node_modules
 .env
 
 # Hardhat files
 /cache
 /artifacts
+/contracts/EVOXFactoryContract.sol
+/contracts/EVOXProperty.sol
+/contracts/EVOXStaking.sol
+/contracts/EVOXSubgraphData.sol
+/contracts/EVOXToken.sol
+/contracts/USDTToken.sol
 
 # TypeChain files
 /typechain
@@ -15,4 +20,5 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
 node_modules

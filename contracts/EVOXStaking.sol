@@ -6,31 +6,26 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "./EVOXProperty.sol";
+import "./EVOXToken.sol";
 
 contract EVOXStaking is
     OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    PropertyCreation
+    ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
 
-    event StakeNft(
+    event StakeToken(
         address Staker,
-        uint256 PropertyID,
-        uint256 NftFractions,
-        uint256 startTime,
-        uint256 endTime,
+        uint256 StakeAmount,
         bool isStaked
     );
 
     event ClaimReward(address Claimer, uint256 RewardAmount, uint256 ClaimTime);
+    event WithDrawReward(address User, uint256 RewardAmount);
 
     struct StakeInfo {
         address Staker;
-        address PropertyAddress;
-        uint256 PropertyID;
-        uint256 NftFractions;
+        uint256 StakingAmount;
         bool isStake;
         uint256 startTime;
         uint256 endTime;
@@ -39,14 +34,14 @@ contract EVOXStaking is
     mapping(address => StakeInfo) public UserInfo;
     mapping(address => uint256) public lastClaimRewardTime;
     mapping(address => uint256) public RewardAmount;
-    IERC20 public RewardToken;
+    IERC20 public EvoxToken;
     uint256 public totalStaked;
     uint256 private APY;
 
     function initialize(IERC20 _EvoxToken, uint256 _APY) public initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
-        RewardToken = _EvoxToken;
+        EvoxToken = _EvoxToken;
         APY = _APY;
     }
 
@@ -55,130 +50,84 @@ contract EVOXStaking is
         APY = _APY;
     }
 
-    function stakeNft(
-        address _propertyAddress,
-        uint256 propertyID,
-        uint256 _propertyFraction,
-        uint256 _endTime
-    ) external nonReentrant {
+    function stakeToken(uint256 amount) external nonReentrant {
         StakeInfo storage info = UserInfo[msg.sender];
-        PropertyCreation property = PropertyCreation(_propertyAddress);
-
-        require(property.exists(propertyID), "Property ID: Not Existed");
-        require(
-            property.balanceOf(msg.sender, propertyID) >= _propertyFraction &&
-                _propertyFraction > 0,
-            "No Fraction Availabe"
-        );
-
-        require(!info.isStake, "Already Staked");
-        require(
-            block.timestamp < _endTime && info.startTime < _endTime,
-            "Time Error"
-        );
+        require(EvoxToken.balanceOf(msg.sender) >= amount && amount > 0, "Insufficient balance");
+        EvoxToken.transferFrom(msg.sender, address(this), amount);
 
         info.Staker = msg.sender;
-        info.PropertyAddress = _propertyAddress;
-        info.PropertyID = propertyID;
-        info.NftFractions = _propertyFraction;
-        info.startTime = block.timestamp;
-        info.endTime = _endTime;
+        info.StakingAmount = amount;
         info.isStake = true;
-        totalStaked += _propertyFraction;
+        totalStaked += amount;
 
-        property.safeTransferFrom(
-            msg.sender,
-            address(this),
-            propertyID,
-            _propertyFraction,
-            ""
-        );
+        emit StakeToken(msg.sender, amount, true);
 
-        emit StakeNft(
-            msg.sender,
-            propertyID,
-            _propertyFraction,
-            block.timestamp,
-            _endTime,
-            true
-        );
     }
 
-    function unStakeNft(uint256 propertyID) external nonReentrant {
-        StakeInfo memory info = UserInfo[msg.sender];
-        require(
-            info.Staker == msg.sender && msg.sender != address(0),
-            "You are not Property Fraction Owner"
-        );
-        require(info.isStake, "Property Fraction is not Staked");
+    // function unStakeNft(uint256 propertyID) external nonReentrant {
+    //     StakeInfo memory info = UserInfo[msg.sender];
+    //     require(
+    //         info.Staker == msg.sender && msg.sender != address(0),
+    //         "You are not Property Fraction Owner"
+    //     );
+    //     require(info.isStake, "Property Fraction is not Staked");
 
-        safeTransferFrom(
-            address(this),
-            msg.sender,
-            propertyID,
-            info.NftFractions,
-            ""
-        );
 
-        totalStaked -= info.NftFractions;
 
-        delete UserInfo[msg.sender];
-    }
 
-    function withDraw() external nonReentrant {
-        StakeInfo memory info = UserInfo[msg.sender];
-        require(RewardAmount[msg.sender] > 0, "Rewards already WithDraw");
-        require(info.Staker == msg.sender, "Only Staker withDraw Reward");
-        require(
-            RewardToken.balanceOf(address(this)) > RewardAmount[msg.sender],
-            "Insufficient rewards in pool"
-        );
+    //     delete UserInfo[msg.sender];
+    // }
 
-        uint256 Reward = RewardAmount[msg.sender];
-        RewardAmount[msg.sender] = 0;
+    // function withDraw() external nonReentrant {
+    //     StakeInfo memory info = UserInfo[msg.sender];
+    //     require(RewardAmount[msg.sender] > 0, "Rewards already WithDraw");
+    //     require(info.Staker == msg.sender, "Only Staker withDraw Reward");
+    //     require(
+    //         EvoxToken.balanceOf(address(this)) > RewardAmount[msg.sender],
+    //         "Insufficient rewards in pool"
+    //     );
 
-        RewardToken.safeTransfer(msg.sender, Reward);
-    }
+    //     uint256 Reward = RewardAmount[msg.sender];
+    //     RewardAmount[msg.sender] = 0;
 
-    function claimReward() external nonReentrant {
-        StakeInfo memory info = UserInfo[msg.sender];
-        require(info.isStake, "Property Fractions is not Staked");
+    //     EvoxToken.safeTransfer(msg.sender, Reward);
 
-        require(block.timestamp <= info.endTime, "Staking Period is over");
-        require(
-            block.timestamp >= lastClaimRewardTime[msg.sender] + 30 days,
-            "Reward claimed Only Once In a Month"
-        );
+    //     emit WithDrawReward(msg.sender, Reward);
+    // }
 
-        uint256 Reward = _calculateReward(msg.sender);
-        RewardAmount[msg.sender] += Reward;
+    // function claimReward() external nonReentrant {
+    //     StakeInfo memory info = UserInfo[msg.sender];
+    //     require(info.isStake, "Property Fractions is not Staked");
 
-        lastClaimRewardTime[msg.sender] = block.timestamp;
+    //     require(block.timestamp <= info.endTime, "Staking Period is over");
+    //     require(
+    //         block.timestamp >= lastClaimRewardTime[msg.sender] + 30 days &&
+    //             block.timestamp >= info.startTime + 30 days,
+    //         "Reward claimed Only Once In a Month"
+    //     );
 
-        emit ClaimReward(msg.sender, Reward, block.timestamp);
-    }
+    //     uint256 Reward = _calculateReward(msg.sender);
+    //     RewardAmount[msg.sender] += Reward;
 
-    function _calculateReward(address _user) public view returns (uint256) {
-        StakeInfo memory info = UserInfo[_user];
-        require(info.Staker == _user, "You are not Staker");
-        require(info.NftFractions > 0, "No Staked Fractions Available");
+    //     lastClaimRewardTime[msg.sender] = block.timestamp;
 
-        uint256 timeElapsed = block.timestamp - info.startTime;
-        uint256 monthlyRate = APY / 12;
-        uint256 calculateReward = (info.NftFractions *
-            monthlyRate *
-            timeElapsed) / 10000 ;
+    //     emit ClaimReward(msg.sender, Reward, block.timestamp);
+    // }
 
-        return calculateReward;
-    }
+    // function _calculateReward(address _user) public view returns (uint256) {
+    //     StakeInfo memory info = UserInfo[_user];
+    //     require(info.Staker == _user, "You are not Staker");
+    //     require(info.NftFractions > 0, "No Staked Fractions Available");
 
-    function onERC1155Received(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes memory
-    ) public virtual override returns (bytes4) {
-        return this.onERC1155Received.selector;
-    }
+    //     //uint256 calculateReward = (info.NftFractions * APY ) / 12 * 100;
+
+    //     uint256 timeElapsed = block.timestamp - info.startTime;
+    //     uint256 timeElapsedInMonths = timeElapsed / 2592000;
+    //     uint256 monthlyRate = APY / 12;
+    //     uint256 calculateReward = info.NftFractions *
+    //         monthlyRate *
+    //         timeElapsedInMonths;
+
+    //     return calculateReward;
+    // }
 }

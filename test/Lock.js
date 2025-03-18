@@ -13,7 +13,7 @@ describe("Natrium Marketpalce", function () {
 
   let deployedEVOXFactoryContract;
   let deployedEVOXTicketingContract;
-  let deployedEVOXMarketplace;
+  let deployedEVOXPreSale;
   let deployedEVOXStaking;
   let deployedEVOXToken;
 
@@ -59,7 +59,7 @@ describe("Natrium Marketpalce", function () {
     await deployedEVOXStaking.connect(owner).waitForDeployment();
     //console.log("EVOX Staking deployed to:", deployedEVOXStaking.target);
 
-    const EVOXToken = await ethers.getContractFactory("MyToken");
+    const EVOXToken = await ethers.getContractFactory("EVOXToken");
 
     deployedEVOXToken = await EVOXToken.deploy();
 
@@ -67,98 +67,298 @@ describe("Natrium Marketpalce", function () {
     await deployedEVOXToken.connect(owner).waitForDeployment();
     //console.log("EVOX Token deployed to:", deployedEVOXToken.target);
 
+    const EVOXPreSale = await ethers.getContractFactory("EvoxPresale");
+
+    deployedEVOXPreSale = await EVOXPreSale.deploy();
+
+    // Wait for the contract to be deployed
+    await deployedEVOXPreSale.connect(owner).waitForDeployment();
+    //console.log("EVOX Token deployed to:", deployedEVOXToken.target);
+
   });
 
   describe("Create Property", function () {
-    it("should deploy new property", async () => {
-      let _propertyName = "EVOX";
-      let _propertyUri = "EVOX.com"
-      let _maxSupply = 100;
-
-      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
-        _propertyName,
-        _propertyUri,
-        _maxSupply,
-        addr1.address
-      )
-      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
-        _propertyName,
-        _propertyUri,
-        _maxSupply,
-        addr1.address
-      )
-      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
-        _propertyName,
-        _propertyUri,
-        _maxSupply,
-        addr1.address
-      )
-      await deployedEVOXFactoryContract.connect(buyer1).deployNewProperty(
-        _propertyName,
-        _propertyUri,
-        _maxSupply,
-        addr1.address
-      )
-
-      let PropertyID0 = await deployedEVOXFactoryContract.deployedContractAddresses(0);
-      let PropertyID1 = await deployedEVOXFactoryContract.deployedContractAddresses(1);
-      let PropertyID2 = await deployedEVOXFactoryContract.deployedContractAddresses(2);
-      let PropertyID3 = await deployedEVOXFactoryContract.deployedContractAddresses(3);
-      console.log("Property ID of 0", PropertyID0);
-      console.log("Property ID of 1", PropertyID1);
-      console.log("Property ID of 2", PropertyID2);
-      console.log("Property ID of 3", PropertyID3);
-
-    });
-
     it("Stake Nfts and get EVOX Reward", async () => {
-      let _propertyName = "Sea Side Villa";
+      let fractionprice = "0.16539132899721";
+      let perFractionPrice = ethers.parseUnits(fractionprice);
+      let _perFractionPriceInEVOX = ethers.parseUnits("500");
       let _propertyUri = "ww.EVOX.com";
-      let fractions = 10;
+      let ROIAmount = ethers.parseUnits("500")
+      let fractions = 200;
       let _propertyID = 1;
+      let ROIPerccenatge = 12000000000000000000n;
       await deployedEVOXTicketingContract.connect(buyer1).initialize(
-        _propertyName, 
-        _propertyUri, 
-        fractions, 
-        buyer1.address, 
-        deployedEVOXFactoryContract.target, 
+        perFractionPrice,
+        _perFractionPriceInEVOX,
+        _propertyUri,
+        fractions,
+        buyer1.address,
+        deployedEVOXFactoryContract.target,
         deployedEVOXToken.target,
-        _propertyID
+        deployedEVOXToken.target,
+        _propertyID,
+        ROIPerccenatge,
+        0
       );
 
-      await deployedEVOXTicketingContract.connect(buyer2).buyPropertyFractions(5, {value: ethers.parseEther("5")});
 
-      let BalanceofBuyer2 = await deployedEVOXTicketingContract.balanceOf(buyer2.address, 1);
-      console.log("Balance of Buyer2 ", BalanceofBuyer2);
 
-      await deployedEVOXStaking.connect(addr1).initialize(deployedEVOXToken.target, 12);
+      // let bool = await deployedEVOXTicketingContract.PropertyCreated(deployedEVOXTicketingContract.target);
+      // console.log("BOOL", bool);
 
-      let getBlockNumber = await ethers.provider.getBlockNumber();
-      getBlock = await ethers.provider.getBlock(getBlockNumber);
-      blockTimestamp = getBlock.timestamp;
+       await deployedEVOXTicketingContract.connect(buyer2).buyPropertyFractions(7, { value: ethers.parseUnits("50") });
 
-      let endTime = blockTimestamp + (365 * 86400);
+      await deployedEVOXToken.connect(buyer2).mint(50000000)
+      await deployedEVOXToken.connect(buyer2).approve(deployedEVOXTicketingContract.target, 500000000000000000000000n);
 
-      await deployedEVOXTicketingContract.connect(buyer2).setApprovalForAll(deployedEVOXStaking.target, true);
-      await deployedEVOXStaking.connect(buyer2).stakeNft(deployedEVOXTicketingContract.target,_propertyID, 5, endTime);
 
-      let PassedDay = 30 * (24 * 60 * 60);
+      await deployedEVOXTicketingContract.connect(buyer2).buyFractionByEVOXTokens(10);
 
-      await ethers.provider.send('evm_increaseTime', [PassedDay]);
-      await ethers.provider.send('evm_mine')
 
-      let Reward = await deployedEVOXStaking._calculateReward(buyer2.address);
-      console.log("Reward", Reward);
+      // let TrackFraction = await deployedEVOXTicketingContract.getOwnedPropertyShares(buyer2.address, 1);
+      // console.log("TRACK Fraction", TrackFraction);
 
-      await deployedEVOXStaking.connect(buyer2).claimReward();
-      let PassedDay30 = 30 * (24 * 60 * 60);
+      await deployedEVOXToken.connect(buyer1).mint(5000)
+      await deployedEVOXToken.connect(buyer1).approve(deployedEVOXTicketingContract.target, 10000000000000000000000n)
+      let amount = await deployedEVOXTicketingContract.calculateDepositROIAmount();
+      await deployedEVOXTicketingContract.connect(buyer1).depositROI(ROIAmount);
+      await deployedEVOXTicketingContract.connect(buyer1).depositROI(ROIAmount);
+      await deployedEVOXTicketingContract.connect(buyer1).depositROI(ROIAmount);
+      let due = await deployedEVOXTicketingContract.calculateDepositROIAmount();
+      console.log("Amount", due)
+       
+      let ListNFT2 = await deployedEVOXTicketingContract.queryFilter("DepositData");
+      let NFT2 = ListNFT2[0];
+      let PropertyID = NFT2.args.DepositAmount;
+      let DepositAmount = NFT2.args.DueAmount;
+      let DepositTime = NFT2.args.DepositTime;
+      let TransactionStatus = NFT2.args.TransactionStatus;
 
-      await ethers.provider.send('evm_increaseTime', [PassedDay30]);
-      await ethers.provider.send('evm_mine')
-      await deployedEVOXStaking.connect(buyer2).claimReward();
 
-      let checkReward = await deployedEVOXStaking.RewardAmount(buyer2.address);
-      console.log("Check Reward", checkReward);
+      console.log(PropertyID,DepositAmount,DepositTime,TransactionStatus
+      );
+
+
+      //  await deployedEVOXTicketingContract.connect(buyer2).claimROI();
+
+      // let PassedDay = 365 * (24 * 60 * 60);
+
+      // await ethers.provider.send('evm_increaseTime', [PassedDay]);
+      // await ethers.provider.send('evm_mine')
+
+      // await deployedEVOXTicketingContract.connect(buyer2).claimROI();
+
+
+      // let ListNFT = await deployedEVOXTicketingContract.queryFilter("ClaimROIAmount");
+      // let NFT = ListNFT[0];
+      // let BuyeR = NFT.args.FractionOwner;
+      // let propertyAddress = NFT.args.RoiAmount;
+
+
+
+      //  console.log(BuyeR, propertyAddress)
+
+      // let ListNFT2 = await deployedEVOXFactoryContract.queryFilter("PropertyInfo");
+      // let NFT2 = ListNFT2[1];
+      // let Buyer = NFT2.args.PropertyName;
+      // let PropertyAddress = NFT2.args.PropertyOwner;
+      // let PropertyID = NFT2.args.perFractionPriceInNative;
+      // let PurchasingTime = NFT2.args.perFractionPriceInEVOX;
+      // let PropertyURI = NFT2.args.PropertyUri;
+      // let NAtive = NFT2.args.totalFractions;
+      // let EVOX = NFT2.args.availableFractions;
+      // let Fractions = NFT2.args.ROIDepositAmount;
+
+      // console.log(Buyer, PropertyAddress, PropertyID, PurchasingTime, PropertyURI, NAtive, EVOX, Fractions)
+
+      // await deployedEVOXStaking.connect(buyer1).initialize(deployedEVOXToken.target, 1200);
+      // //await deployedEVOXStaking.connect(buyer1).initialize(deployedEVOXToken.target, 12);
+
+      // let getBlockNumber = await ethers.provider.getBlockNumber();
+      // getBlock = await ethers.provider.getBlock(getBlockNumber);
+      // let EventStartDate = getBlock.timestamp;
+      // let EventEndDate = EventStartDate + (365 * 86400);
+      // await deployedEVOXToken.connect(buyer2).mint(1)
+
+      // await deployedEVOXToken.connect(buyer2).approve(deployedEVOXStaking.target, 10000000000000000000n);
+
+      // await deployedEVOXStaking.connect(buyer2).stakeToken(10000000000000000000n
+      // );
+
+      
+      // let Passed = 360 * (24 * 60 * 60);
+
+      // await ethers.provider.send('evm_increaseTime', [Passed]);
+      // await ethers.provider.send('evm_mine')
+
+      // await deployedEVOXStaking.connect(buyer2).claimReward();
+
+      // let Pass = 30 * (24 * 60 * 60);
+
+      // await ethers.provider.send('evm_increaseTime', [Pass]);
+      // await ethers.provider.send('evm_mine')
+      // await deployedEVOXStaking.connect(buyer2).claimReward();
+
+      // let RewardAmount = await deployedEVOXStaking.connect(buyer2)._calculateReward(buyer2.address);
+      // console.log("reward amount", RewardAmount);
+
+      // let RewardAmounts = await deployedEVOXStaking.connect(buyer2).RewardAmount(buyer2.address);
+      // console.log("reward amount", RewardAmounts);
+    });
+    it("should Pre-Sale tokens", async() => {
+//       const currentTimestamp = Math.floor(Date.now() / 1000);
+//       let getBlockNumber = await ethers.provider.getBlockNumber();
+//       getBlock = await ethers.provider.getBlock(getBlockNumber);
+//       let EventStartDate = getBlock.timestamp;
+//       let _bnbAddress = addr1.address;
+//       let _usdtAddress = admin.address;
+//       let _priceFeedBNB = addr1.address;
+//       let _priceFeedUSDT = admin.address;
+//       let _fundsWallet = buyer1.address;
+//       let _maxCap = 1000000000000000000000000n;
+//       let _token = deployedEVOXToken.target;
+//       let _minBuyAmount = 100000000000000000000n;
+//       let _maxBuyAmount = 10000000000000000000000000n
+//       let _tokenPrice = ethers.parseUnits("1");
+//       let _initialUnlock = 10
+//       let _cliffDuration = 0;
+//       let TGE = EventStartDate + (30 * 86400);
+
+//       let _vestingDuration = 12;
+//       let _active = true;
+
+//       await deployedEVOXPreSale.connect(buyer1).initialize(
+//         _bnbAddress,
+//         _usdtAddress,
+//         _priceFeedBNB,
+//         _priceFeedUSDT,
+//         _fundsWallet,
+//         _maxCap,
+//         _token
+//       );
+
+//       await deployedEVOXPreSale.connect(buyer1).startRound(
+//         _minBuyAmount,
+//         _maxBuyAmount,
+//         _tokenPrice,
+//         _initialUnlock,
+//         _cliffDuration,
+//         _vestingDuration,
+//         1000000000000000000n,
+//         _active
+//       );
+
+//       // let Rounds = await deployedEVOXPreSale.rounds(0);
+//       // console.log("Rounds", Rounds);
+
+//       await deployedEVOXToken.connect(buyer2).mint(10000);
+//       await deployedEVOXToken.connect(buyer2).approve(deployedEVOXPreSale.target, 100000000000000000000n);
+
+//        await deployedEVOXPreSale.connect(buyer2).buyWithToken(deployedEVOXToken.target, 5000000000000000000n);
+//        await deployedEVOXPreSale.connect(buyer2).buyWithToken(deployedEVOXToken.target, 7000000000000000000n);
+//        await deployedEVOXPreSale.connect(buyer2).buyWithToken(deployedEVOXToken.target, 9000000000000000000n);
+//       await deployedEVOXPreSale.connect(buyer2).buyWithBNB({value: ethers.parseUnits("0.01")});
+
+//       await deployedEVOXPreSale.connect(buyer1).openClaiming();
+//       await deployedEVOXPreSale.connect(buyer1).tgeTime(TGE);
+//       await deployedEVOXToken.connect(buyer1).mint(200000000);
+//       await deployedEVOXToken.connect(buyer1).approve(deployedEVOXPreSale.target, 120620000000000000000000n);
+
+//       let PassedDay = 30 * (24 * 60 * 60);
+
+//       await ethers.provider.send('evm_increaseTime', [PassedDay]);
+//       await ethers.provider.send('evm_mine')
+
+//       await deployedEVOXPreSale.connect(buyer2).claimAll();
+
+//       let LET = 160 * (24 * 60 * 60);
+
+//       await ethers.provider.send('evm_increaseTime', [LET]);
+//       await ethers.provider.send('evm_mine')
+
+//       await deployedEVOXPreSale.connect(buyer2).claimAll();
+// //       let Passedday = 1 * (30 * 24 * 60 * 60);
+
+// //       await ethers.provider.send('evm_increaseTime', [Passedday]);
+// //       await ethers.provider.send('evm_mine')
+
+// //        await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //        let one = 2 * (30 * 24 * 60 * 60);
+
+// //        await ethers.provider.send('evm_increaseTime', [one]);
+// //        await ethers.provider.send('evm_mine')
+ 
+// //         await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //         let two = 3 * (30 * 24 * 60 * 60);
+
+// //         await ethers.provider.send('evm_increaseTime', [two]);
+// //         await ethers.provider.send('evm_mine')
+  
+// //          await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //          let three = 3 * (30 * 24 * 60 * 60);
+
+// //          await ethers.provider.send('evm_increaseTime', [three]);
+// //          await ethers.provider.send('evm_mine')
+// //         await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //         let four = 3 * (30 * 24 * 60 * 60);
+
+// //         await ethers.provider.send('evm_increaseTime', [four]);
+// //         await ethers.provider.send('evm_mine')
+// //        await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //        let five = 3 * (30 * 24 * 60 * 60);
+
+// //        await ethers.provider.send('evm_increaseTime', [five]);
+// //        await ethers.provider.send('evm_mine')
+// //       await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //       let six = 3 * (30 * 24 * 60 * 60);
+
+// //       await ethers.provider.send('evm_increaseTime', [six]);
+// //       await ethers.provider.send('evm_mine')
+// //      await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //      let sevene = 3 * (30 * 24 * 60 * 60);
+
+// //      await ethers.provider.send('evm_increaseTime', [sevene]);
+// //      await ethers.provider.send('evm_mine')
+// //     await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //     let eight = 3 * (30 * 24 * 60 * 60);
+
+// //     await ethers.provider.send('evm_increaseTime', [eight]);
+// //     await ethers.provider.send('evm_mine')
+// //    await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //    let nine = 3 * (30 * 24 * 60 * 60);
+
+// //    await ethers.provider.send('evm_increaseTime', [nine]);
+// //    await ethers.provider.send('evm_mine')
+// //   await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //   let ten = 3 * (30 * 24 * 60 * 60);
+
+// //   await ethers.provider.send('evm_increaseTime', [ten]);
+// //   await ethers.provider.send('evm_mine')
+// //  await deployedEVOXPreSale.connect(buyer2).claim(1);
+
+// //  let eleven = 3 * (30 * 24 * 60 * 60);
+
+// //  await ethers.provider.send('evm_increaseTime', [ten]);
+// //  await ethers.provider.send('evm_mine')
+// // await deployedEVOXPreSale.connect(buyer2).claim();
+
+//       let UserPucahse = await deployedEVOXPreSale.connect(buyer2).userPurchases(buyer2.address, 0);
+//       console.log("User Purchase", UserPucahse);
+
+//       // let userdata = await deployedEVOXPreSale.connect(buyer2).getUserData(buyer2.address);
+//       // console.log("User Purchase", userdata);
+
+
     })
   });
 });
