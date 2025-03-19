@@ -46,7 +46,8 @@ contract PropertyCreation is
         address PropertyOwner,
         uint256 PropertyID,
         uint256 ROIAmount,
-        uint256 DepositTime
+        uint256 DepositTime,
+        uint256 DueAmount
     );
 
     event ClaimROIAmount(
@@ -162,7 +163,9 @@ contract PropertyCreation is
         FactoryAddress = _factoryAddress;
         EvoxToken = IERC20(_EVOXToken);
         USDTAddress = IERC20(_usdtTokenAddress);
-        
+
+        priceFeeds[priceFeedBNB] = AggregatorV3Interface(priceFeedBNB);
+        priceFeeds[priceFeedEVOX] = AggregatorV3Interface(priceFeedEVOX);
 
         if (_roiPeriod == 0) {
             roiPeriod = ROIPeriod.Monthly;
@@ -358,13 +361,13 @@ contract PropertyCreation is
         return uint256(price) * 1e10; // Convert 8 decimal places to 18
     }
 
-    function depositROI() 
-    external 
-    onlyPropertyDeveloper 
-    isEligibleToClaimROI 
-    nonReentrant 
+    function depositROI()
+        external
+        onlyPropertyDeveloper
+        isEligibleToClaimROI
+        nonReentrant
     {
-        uint256 _roiAmount = calculateDepositROIAmount();
+        (uint256 _roiAmount, uint256 dueAmount )= calculateDepositROIAmount();
         require(
             USDTAddress.balanceOf(msg.sender) >= _roiAmount,
             "InSufficient Balance"
@@ -408,17 +411,18 @@ contract PropertyCreation is
             address(this),
             propertyDetails.PropertyID,
             _roiAmount,
-            propertyDetails.totalROIDepositAmount
+            propertyDetails.totalROIDepositAmount,
+            dueAmount
         );
 
         emit ROIDeposit(
             msg.sender,
             propertyDetails.PropertyID,
             _roiAmount,
+            dueAmount,
             block.timestamp
         );
     }
-
 
     function claimROI() external isEligibleToClaimROI nonReentrant {
         UserDetail storage users = User[msg.sender][propertyDetails.PropertyID];
@@ -478,7 +482,7 @@ contract PropertyCreation is
     function calculateDepositROIAmount()
         public
         view
-        returns (uint256)
+        returns (uint256, uint256)
     {
         uint256 soldFractions = propertyDetails.totalFractions -
             propertyDetails.availableFractions;
@@ -488,7 +492,6 @@ contract PropertyCreation is
         uint256 getNativeUSDTAmount = getLatestPrice(priceFeedBNB);
         uint256 getEVOXUSDTAmount = getLatestPrice(priceFeedEVOX);
 
-
         uint256 DepositAmountInNative = (soldFractions *
             PriceInNative *
             ROIPercent) / (100 * 10 ** 18);
@@ -496,11 +499,27 @@ contract PropertyCreation is
             PriceInEVOX *
             ROIPercent) / (100 * 10 ** 18);
 
-        uint256 NativeAmount = (DepositAmountInNative * getNativeUSDTAmount) / 1e18;
+        uint256 NativeAmount = (DepositAmountInNative * getNativeUSDTAmount) /
+            1e18;
         uint256 EVOXAmount = (depositAmountInEVOX * getEVOXUSDTAmount) / 1e18;
 
         uint256 depositAmount = NativeAmount + EVOXAmount;
-        return depositAmount;
+
+        uint256 totalDepositAmountInNative = (propertyDetails.totalFractions *
+            PriceInNative *
+            ROIPercent) / (100 * 10 ** 18);
+        uint256 totaldepositAmountInEVOX = (propertyDetails.totalFractions *
+            PriceInEVOX *
+            ROIPercent) / (100 * 10 ** 18);
+
+        uint256 nativeAmount = (totalDepositAmountInNative *
+            getNativeUSDTAmount) / 1e18;
+        uint256 evoxAmount = (totaldepositAmountInEVOX * getEVOXUSDTAmount) /
+            1e18;
+        uint256 totalAmount = nativeAmount + evoxAmount;
+        uint256 dueAmount = totalAmount - propertyDetails.totalROIDepositAmount;
+
+        return (depositAmount, dueAmount);
     }
 
     function _setTokenURI(

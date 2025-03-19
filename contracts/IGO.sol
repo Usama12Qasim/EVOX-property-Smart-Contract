@@ -227,7 +227,6 @@ contract IGOPresale is
         }
 
         uint256 totalTokens = (_allocationPercentage * maxCap) / 100;
-        uint256 initialUnlockTokens = (totalTokens * _initialUnlock) / 100;
 
         rounds.push(
             Round({
@@ -236,7 +235,7 @@ contract IGOPresale is
                 tokenPrice: _tokenPrice,
                 active: _active,
                 totalTokens: totalTokens,
-                initialUnlock: initialUnlockTokens,
+                initialUnlock: _initialUnlock,
                 cliffDuration: _cliffDuration,
                 vestingDuration: _vestingDuration,
                 tokensSold: 0
@@ -287,7 +286,7 @@ contract IGOPresale is
             address(this)
         );
         require(allowance >= tokenCost, "Token allowance too low");
-        IERC20(_tokenAddress).safeTransferFrom(
+        IERC20(_tokenAddress).transferFrom(
             msg.sender,
             fundsWallet,
             tokenCost
@@ -453,7 +452,7 @@ contract IGOPresale is
 
                     purchase.claimAmount += initialClaimAmount;
                     purchase.initialClaim = true;
-                    purchase.nextClaimDate = block.timestamp;
+                    purchase.lastClaimTime = block.timestamp;
                     purchase.nextClaimDate = VestingStartTime;
                     totalClaimable += initialClaimAmount;
                     purchase.isClaimed = true;
@@ -471,7 +470,6 @@ contract IGOPresale is
 
                 // 3️⃣ **Vesting: Only Allow Claims Every Month**
                 require(
-                    purchase.lastClaimTime == 0 ||
                         block.timestamp >= purchase.lastClaimTime + 30 days,
                     "You can only claim once per month"
                 );
@@ -547,7 +545,7 @@ contract IGOPresale is
 
                     purchase.claimAmount += initialClaimAmount;
                     purchase.initialClaim = true;
-                    purchase.nextClaimDate = block.timestamp;
+                    purchase.lastClaimTime = block.timestamp;
                     purchase.nextClaimDate = VestingStartTime;
                     totalClaimable += initialClaimAmount;
                     purchase.isClaimed = true;
